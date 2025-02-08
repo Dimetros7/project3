@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plastic Pollution Heatmap</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <style>
+        #map { height: 600px; }
+        #controls { margin: 10px; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <label for="wasteType">Select Waste Type:</label>
+        <select id="wasteType"></select>
+    </div>
+    <div id="map"></div>
+
+    <script>
+        let map = L.map('map').setView([20, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+        let heatLayer;
+
+        function loadCSV() {
+            fetch('C:\Users\derej\OneDrive\Desktop\Boot_Camp_plastic_pollution.csv')
+                .then(response => response.text())
+                .then(csvText => {
+                    Papa.parse(csvText, {
+                        header: true,
+                        dynamicTyping: true,
+                        complete: function(results) {
+                            processCSVData(results.data);
+                        }
+                    });
+                });
+        }
+
+        function processCSVData(data) {
+            let wasteTypes = new Set();
+            let pollutionData = {};
+
+            data.forEach(row => {
+                let { latitude, longitude, waste_type, pollution_level } = row;
+                if (latitude && longitude && waste_type) {
+                    wasteTypes.add(waste_type);
+                    if (!pollutionData[waste_type]) {
+                        pollutionData[waste_type] = [];
+                    }
+                    pollutionData[waste_type].push([latitude, longitude, pollution_level || 1]);
+                }
+            });
+            
+            populateDropdown(wasteTypes, pollutionData);
+        }
+
+        function populateDropdown(wasteTypes, pollutionData) {
+            let dropdown = document.getElementById('wasteType');
+            wasteTypes.forEach(type => {
+                let option = document.createElement('option');
+                option.value = type;
+                option.textContent = type;
+                dropdown.appendChild(option);
+            });
+            dropdown.addEventListener('change', () => updateHeatmap(dropdown.value, pollutionData));
+            updateHeatmap(dropdown.value, pollutionData);
+        }
+
+        function updateHeatmap(selectedType, pollutionData) {
+            if (heatLayer) {
+                map.removeLayer(heatLayer);
+            }
+            heatLayer = L.heatLayer(pollutionData[selectedType] || [], { radius: 20, blur: 15, maxZoom: 10 }).addTo(map);
+        }
+
+        loadCSV();
+    </script>
+</body>
+</html>
